@@ -1,12 +1,13 @@
-BUILD_ARTIFACT=py-fun-SNAPSHOT-0.1.0.tar
-BUILD = build
-DOCS_BUILD = docs/_build/html
+BUILD_ARTIFACT=py-fun-SNAPSHOT-0.1.0.tar # name of the final distributable package
+BUILD = build # build output directory
+DOCS_BUILD = docs/_build/html # Documentation build directory
+REQUIREMENTS="requirements.txt" # Python Dependencies file
 
-# first goal is default
+# first goal is default, execute python application
 run:
 	python main.py
 
-# package distributable artifact after clean project build
+# create distributable package (cleans previous builds, runs tests and builds, creates tar archive in build/ directory)
 package: clean build
 	tar cvf $(BUILD)/$(BUILD_ARTIFACT) -C $(BUILD)/lib .
 	@echo -e "\\\\\\\\\nartifact: \"$(BUILD)/$(BUILD_ARTIFACT)\" built"
@@ -32,8 +33,6 @@ clean:
 	rm -rf $(BUILD) $(shell dirname $(DOCS_BUILD))
 	find . -type d -name '__pycache__' | xargs rm -rf
 
-# install Python dependencies from 'requirements.txt'
-REQUIREMENTS="requirements.txt"
 #
 install:
 	@pip install -r $(REQUIREMENTS) | grep -v "already satisfied" || \

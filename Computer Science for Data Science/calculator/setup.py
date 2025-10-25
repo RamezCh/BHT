@@ -12,13 +12,13 @@ with open('README.md', encoding="utf8") as f:
 #     license = f.read()
 
 setup(
-    name='py-fun',
+    name='calculator',
     version='0.1.0',
-    description='Sample Python package from Python-Guide.org',
+    description='Simple Calculator that can also calculate words from 0-9 in a few languages',
     long_description=readme,
-    author='Kenneth Reitz',
-    author_email='me@kennethreitz.com',
-    url='https://github.com/kennethreitz/samplemod',
+    author='Ramez Chreide',
+    author_email='me@ramezchreide.com',
+    url='https://github.com/RamezCh/BHT/tree/main/Computer%20Science%20for%20Data%20Science/calculator',
     license=license,
     packages=find_packages(exclude=('tests', 'docs'))
 )

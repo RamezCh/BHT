@@ -27,21 +27,23 @@ class Calculator:
                                'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9}
 
     def _parse_latin_numeral(self, value):
-        """Parse Roman numerals (case-insensitive)"""
+        """Parse Roman numerals (case-insensitive). Raises ValueError if invalid."""
         roman_map = {'i': 1, 'v': 5, 'x': 10, 'l': 50, 'c': 100, 'd': 500, 'm': 1000}
-
         value_lower = value.lower()
+
+        # if contains invalid characters, raise ValueError
+        if not all(c in roman_map for c in value_lower):
+            raise ValueError(f"Invalid Roman numeral: {value}")
+
         result = 0
         prev_value = 0
 
         for char in reversed(value_lower):
-            current_value = roman_map.get(char, 0)
-
+            current_value = roman_map[char]
             if current_value >= prev_value:
                 result += current_value
             else:
                 result -= current_value
-
             prev_value = current_value
 
         return result
@@ -121,7 +123,10 @@ class Calculator:
         Supports multiple input formats and cases.
         Only works with integers.
         """
-        number = self._parse_input(n)
+        try:
+            number = self._parse_input(n)
+        except ValueError:
+            raise ValueError(f"Invalid input for factorization: {n}")
 
         # Ensure we have an integer for factorization
         if isinstance(number, float):
@@ -130,6 +135,8 @@ class Calculator:
             else:
                 raise ValueError("Factorization only works with integers")
 
+        if number < 0:
+            raise ValueError("Cannot factorize negative numbers")
         if number < 2:
             return []
 
