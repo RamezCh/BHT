@@ -1,10 +1,5 @@
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-<!-- Solution of Assignment A2 (CS4BD)
--->
 ## Solution A2: Creating a *Python*-Project
 
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
 The assignment shows good practices how to create and structure a *Python*
 project. Few rules should be followed when creating a new software development.
 They generally apply, regardless of the programming language:
@@ -35,7 +30,7 @@ common).
 
 ---
 
-Goal of this assignment is to set-up a new *Python* project following the guidance
+Goal of this assignment is to set up a new *Python* project following the guidance
 from the article.
 The project will create two components, a *"Calculator"* with methods:
 
@@ -56,7 +51,7 @@ The project will create two components, a *"Calculator"* with methods:
 
 - *contains( s, e )* - calculate the number of times element *e* is in *s*,
 
-- *zip(s, p)* - pair consequitive elements from *s* and *p*,
+- *zip(s, p)* - pair consecutive elements from *s* and *p*,
 
 - *pset( s )* - calculate the powerset of *s*,
 
@@ -85,341 +80,57 @@ Steps:
 1. Step: [*Push Project to Remote *git* Repository*](#8-push-project-to-remote-git-repository).
 
 1. Step: [*Unit Tests*](#9-unit-tests).
-<!-- 
-1. Step: [*Release*](#10-release).
-    - build distributable package, actually release 'make build'
--->
 
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
 ### 1. Answer Questions for *Python* Project-Setup
 
 1. What is the *project scaffold*?
+    
+    -> The initial structure or template of a software project. It provides a pre-defined directory layout, configuration files and boilerplate code
 
-1. What is a software *build process*?
+2. What is a software *build process*?
 
-1. When does the software *build process* start and when does it end?
+    -> A sequence of steps that convert source code into a runnable product like an executable, library or deployable package. In Python, building usually means creating a distributable package like .whl or .tar.gz rather than compiling to machine code
 
-1. What are steps and what is the result of the software *build process*?
+3. When does the software *build process* start and when does it end?
 
-1. What is *make*?
+    -> It starts when the source code and dependencies are ready to be integrated or distributed and ends when we have a runnable artifact or deployable package. E.g. Start -> Code + Dependencies -> Testing -> Packaging -> End
 
-1. What is the purpose of file *requirements.txt*? How is it used?
+4. What are steps and what is the result of the software *build process*?
 
-1. What is a *Build Server*? What does it mean for *Python*?
+    -> Typical steps are: Fetch dependencies (requirements.txt), Compile/pre-process code(if needed), Run Tests, Bundle or Package, Deploy or publish
 
-1. What are *Nightly Builds*?
+5. What is *make*?
 
-1. What are the differences between
+    -> Make is a build automation tool that uses a Makefile to define rules and dependencies for building software
+
+6. What is the purpose of file *requirements.txt*? How is it used?
+
+    -> It lists all Python dependencies needed for a project and can be installed with pip install -r requirements.txt
+
+7. What is a *Build Server*? What does it mean for *Python*?
+
+    -> A Building Server is a dedicated machine or service that automatically runs the build process whenever code changes (e.g. a Git push). You can think of Jenkins, GitHubActions, CircleCI and so on.. For Python it means setting up a virtual environment, installing dependencies, running tests, building the package, optionally deploying
+
+8. What are *Nightly Builds*?
+
+    -> They are automated builds created every night or on a schedule that contain the latest code and help catch regressions early. They are often used in CI(Continuous Integration) systems to monitor code stability over time.
+
+9. What are the differences between
     [*"Scripts, Modules, Packages, and Libraries"*](https://realpython.com/videos/scripts-modules-packages-and-libraries)
     in *Python*?
 
-1. What is *_ _ _init_ _ _.py* meant to be used for?
+    -> A Script is meant to be executed directly like main.py, a Module has functions, classes or variables that can be imported, A Package is a directory containing multiple modules and an __init__.py file, a Library is a collection of modules/packages designed for re-use like numpy or requests
 
+10. What is *_ _ _init_ _ _.py* meant to be used for?
 
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    -> It marks a directory as a Python package so it can be imported. __all__ is used to specify what is imported from package
 
-&nbsp;
 ---
-### 2. Create Project: "py-fun"
-
-Find a proper workspace (directory) on your laptop to host the new project:
 
 ```sh
-# cd to the directory where you store your Python projects
-cd <path-to-workspace>
-
-mkdir py-fun                    # create the new project 'py-fun'
-
-cd py-fun                       # cd into the new project
-
-mkdir -p src/calculator             # make the directory for the 'Calculator'
-mkdir -p tests/calculator           # make directory for 'Calculator' tests
-
-url="https://raw.githubusercontent.com/sgra64/py-fun/refs/heads/main"
-curl -o makefile $url/makefile          # fetch 'makefile' from URL
-curl -o requirements.txt $url/requirements.txt
-curl -o main.py $url/main.py            # fetch 'main.py' from URL
-curl -o src/main.py $url/src/main.py    # fetch 'src/main.py'
-curl -o src/__init__.py $url/src/__init__.py
-
-mkdir docs                      # create the docs directory
-# fetch content of docs directory
-
-mkdir .vscode                   # create the .vscode directory
-# fetch content of .vscode directory
-
 find .                          # show project scaffold
 ```
 
-Output shows the files of the project:
-
-```
-./docs
-./docs/conf.py
-./docs/index.rst
-./docs/makefile
-./main.py
-./makefile
-./requirements.txt
-./results.txt
-./src
-./src/calculator
-./src/__init__.py
-./src/main.py
-./tests
-./tests/calculator
-```
-
-<!-- 
-mkdir docs                      # fetch content of docs directory
-curl -o docs/conf.py   $url/docs/conf.py
-curl -o docs/index.rst $url/docs/index.rst
-curl -o docs/makefile  $url/docs/makefile
-
-mkdir .vscode                   # fetch content of .vscode directory
-curl -o .vscode/settings.json $url/.vscode/settings.json
-curl -o .vscode/launch.json   $url/.vscode/launch.json
-curl -o .vscode/launch-terminal.json $url/.vscode/launch-terminal.json
--->
-
-The diagram shows the project scaffold:
-
-```sh
-<workspace>             # workspace with Python projects
- |
- +-<py-fun>                 # project directory
- |  |
- |  +-<.vscode>                 # settings files for VSCode IDE
- |  |   +--settings.json
- |  |   +--launch.json
- |  |   +--launch-terminal.json
- |  |
- |  +--makefile                 # project build file
- |  +--requirements.txt         # installation dependencies
- |  +--setup.py                 # python build (create distributabe package)
- |  +--main.py                  # main python file, launches 'src/main.py'
- |  +--results.txt              # output with expected results
- |  |
- |  +-<src>                     # project source code
- |  |  +--__init.py__           # package file
- |  |  +--main.py               # actual main.py file that runs code
- |  |  +-<calculator>           # sub-directory for 'Calculator' source code
- |  |
- |  +-<tests>                   # project test code
- |  |  +-<calculator>           # sub-directory for 'Calculator' test code
- |  |
- |  +-<docs>                    # project documentation
- |  |  +--makefile              # documentation build file
- |  |  +--conf.py, index.rst    # other files in 'docs'
- |  |
-```
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
-### 3. Build the Project
-
-```sh
-mvn compile
-find target
-
-mvn package
-ls -la target               # show: my-app-1.0-SNAPSHOT.jar
-
-# don't run .jar yet
-```
-
-Don't run the *.jar* yet sind it throws:
-*"no main manifest attribute, in target/my-app-1.0-SNAPSHOT.jar"*
-exception.
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
-### 4. Create the *Calculator*
-
-Create a component *Calculator* in `src/calculator` such that it provides the
-indicated functions such that it can be imported and used in
-[*src/main.py*](src/main.py):
-
-```py
-from .calculator import Calculator
-
-def main():
-    # instantiate calculators
-    c1 = Calculator()
-    c2 = Calculator()
-    # 
-    print(f' 1: c1.add(1, 2)\t-> {c1.add(1, 2)}')
-    print(f' 2: c2.add(8, 3)\t-> {c2.add(8, 3)}')
-```
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
-### 5. Run the *Calculator*
-
-Run the *Calculator* from the project directory:
-
-```sh
-make run                # run "the project" ('main.py' in the project directory)
-
-python main.py          # run 'main.py' in the project directory directly
-```
-
-Output shows the correct results:
-
-```
- 1: c1.add(1, 2)        -> 3
- 2: c2.add(8, 3)        -> 11
-```
-
-Remove the comment following calculation `2:` in [*src/main.py*](src/main.py):
-
-```py
-print(f' 3: c1.add("1", "1")\t-> {c1.add("1", "1")}')     # <-- uncomment
-# print(f' 4: c1.add("X", "V")\t-> {c1.add("X", "V")}')
-# print(f' 5: c2.factorize(99)\t-> {c1.factorize(99)}')
-```
-
-Run the code:
-
-```
- 1: c1.add(1, 2)        -> 3
- 2: c2.add(8, 3)        -> 11
- 3: c1.add("1", "1")    -> 11
-```
-
-Why does calculation `add("1", "1")` yields `11` and not as expected `2`?
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
-### 6. Extend the *Calculator*
-
-Fix the problem such that the calculation before returns the expected value `2`.
-
-The following calculations show that *Calculator* has extended capabilities:
-
-- *Calculator* understands names of *single-digit* numbers in *English*,
-    *German*, *Spanish*, *Russian* (in *Cyrillic*) and *Chinese*.
-    
-    Examples:
-
-    - *c1.add("one", "four")* --> `5`,
-    - "drei" + 9 --> `12`, "четыре" + "eight" --> `12`,
-    - "三" (3) + "四" (4) --> 7.
-
-- *Calculator* also understands *Latin* *single-digit* numbers.
-
-    Examples:
-
-    - "I" + "II" -> `3`, "V" + "IV" -> `9`, "VIII" / "II" -> `4`.
-
-- Method *factorize( n )* returns prime factors of *n*.
-
-    Examples:
-
-    - 17: c2.factorize("три")       -> [3] (prime number),
-    - 18: c2.factorize("X")         -> [2, 5]
-    - 19: c2.factorize("ocho")      -> [2, 2, 2]
-    - 20: c2.factorize(3+5)         -> [2, 2, 2]
-    - 22: c2.factorize(1092)        -> [2, 2, 3, 7, 13]
-    - 23: c2.factorize(32768)       -> [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-    - 24: c2.factorize(10952347)    -> [7, 23, 59, 1153]
-    - 25: c2.factorize(100000039)   -> [100000039] (prime number).
-
-Improve the *Calculator* such that it meets these extended capabilities.
-
-Validate your implementation by running all examples in [*src/main.py*](src/main.py).
-Enable the expressions list.
-
-```py
-# set True to run the examples from the expression list
-_run_list=True
-expr=[
-    'c1.add("1", "1.600")',         # 2.6
-    'c1.add("three", "1.600")',     # 4.6
-    'c1.add("cinco", "siete")',     # 12
-    'c1.add("семь", "восемь")',     # 15
-    'c1.add("III", "   VIII")',     # 11
-    'c1.add("三", "五")',            # 8
-    'c1.add("0", "X")',             # 10
-    'c2.add("ocho", "nueve")',      # 17
-    'c2.sub("ocho", "nueve")',      # -1
-    'c2.mul("ocho", "nueve")',      # 72
-    'c2.div("ocho", "dos")',        # 4.0
-    '',
-    'c2.factorize("три")',          # [3]
-    'c2.factorize("X")',            # [2, 5]
-    'c2.factorize("ocho")',         # [2, 2, 2]
-    'c2.factorize(3+5)',            # [2, 2, 2]
-    'c2.factorize(27)',             # [3, 3, 3]
-    'c2.factorize(1092)',           # [2, 2, 3, 7, 13]
-    'c2.factorize(32768)',          # [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-    'c2.factorize(10952347)',       # [7, 23, 59, 1153]
-    'c2.factorize(100000039)',      # [100000039] (prime number)
-    '',
-] if _run_list else []
-```
-
-Correct results can also be found in [*results.txt*](results.txt).
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
-### 7. Check Project into Local *git* Repository
-
-
-
-<!-- 
-Create local *git* repository and file
-[*.gitignore*](https://github.com/sgra64/se1-play/blob/main/.gitignore).
-
-```sh
-git init --initial-branch=main
-
-git commit --allow-empty -m "root commit (empty)"
-git tag root
-
-curl --output .gitignore \
-    "https://raw.githubusercontent.com/sgra64/se1-play/refs/heads/main/.gitignore"
-
-git add -f .gitignore && git commit -m "add .gitignore"
-
-git add pom.xml src
-git commit -m "add pom.xml src"
-``` -->
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
----
-### 8. Push Project to Remote *git* Repository
-
-
-Find out how to push a locally created project into a remote *git* repository.
-
-
-
-<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-&nbsp;
 ---
 ### 9. Unit Tests
 
