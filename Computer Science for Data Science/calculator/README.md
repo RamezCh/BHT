@@ -129,3 +129,4 @@ An instantiable component that provides list and set operations:
 ```bash
 find .    # display project structure
 ```
+**NOTE** Adding -n after make shows the steps without execution
