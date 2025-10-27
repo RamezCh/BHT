@@ -50,18 +50,18 @@ class Calculator:
 
     def _parse_input(self, value):
         """Convert any supported input to number (case-insensitive)"""
-        # If it's already a number, return as-is (your simple approach)
         if isinstance(value, (int, float)):
             return value
 
         if isinstance(value, str):
-            # First try to parse as a number (int or float)
+            # Remove leading/trailing spaces
+            value = value.strip()
+
+            # Try to parse as int or float
             try:
-                # Try int first
                 return int(value)
             except ValueError:
                 try:
-                    # Then try float
                     return float(value)
                 except ValueError:
                     pass
@@ -80,12 +80,12 @@ class Calculator:
             # Try to parse as Roman numeral
             try:
                 roman_value = self._parse_latin_numeral(value)
-                if roman_value > 0 and roman_value <= 100:
+                if 0 < roman_value <= 100:
                     return roman_value
             except:
                 pass
 
-            # Special handling for Chinese and Russian - check original case
+            # Special handling for languages with non-Latin characters
             if value in self.unified_mapping:
                 return self.unified_mapping[value]
 
