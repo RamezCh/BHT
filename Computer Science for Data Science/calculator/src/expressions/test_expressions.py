@@ -10,10 +10,12 @@ Output with verbosity level < 2:
 Ran 11 tests in 0.002s
 OK
 <unittest.runner.TextTestResult run=11 errors=0 failures=0>
+
+curl $test_url | sed -e 's/^#.*Test_case_/Test_case_/' | python -c "import sys; sys.path.append('src/expressions'); exec(sys.stdin.read())"
 """
 # import abc
 import unittest
-from expressions import Expressions
+from .expressions import Expressions
 
 
 """
