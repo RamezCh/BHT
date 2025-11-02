@@ -15,7 +15,10 @@ curl $test_url | sed -e 's/^#.*Test_case_/Test_case_/' | python -c "import sys; 
 """
 # import abc
 import unittest
-from .expressions import Expressions
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from src.expressions import Expressions
 
 
 """

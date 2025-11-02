@@ -1,1 +1,1 @@
-from .calculator.test_basic import *
+# should be empty, unittest should discover the tests

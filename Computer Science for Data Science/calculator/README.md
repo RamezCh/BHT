@@ -384,3 +384,29 @@ OK
 Check branch `expressions` into your remote repository.
 
 (1 Pt)
+
+
+## Ending Notes - What I faced and learnt
+
+You may notice that running tests with `python -m unittest` works, but running a test file directly (e.g., `python tests/calculator/test_expressions.py`) fails with a `ModuleNotFoundError`. This is expected behavior and is a core concept of Python's import system.
+
+### The Problem: `sys.path`
+
+* **`python -m unittest` (Correct):** When you run this command from the project root, Python adds the **project root directory** to its `sys.path` (the list of places it looks for modules). Your test file's imports, like `from src.calculator.expressions import Expressions`, work perfectly because Python finds the `src` directory in the project root.
+
+* **`python tests/calculator/test_expressions.py` (Incorrect):** When you run a file directly, Python adds that **file's directory** (`tests/calculator/`) to the `sys.path`. Your test file's imports fail because Python cannot find the `src` directory *inside* `tests/calculator/`.
+
+**Rule:** Always run your tests using the `unittest` module from the project's root directory.
+
+### How to Run Tests Correctly
+
+```bash
+# To run ALL tests in the 'tests' directory
+python -m unittest discover
+
+# To run a single test file
+python -m unittest tests/calculator/test_expressions.py
+
+# To run a single test class
+python -m unittest tests.calculator.test_expressions.TestMyExpressions
+```
