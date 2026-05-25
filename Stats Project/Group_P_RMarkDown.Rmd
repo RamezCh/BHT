@@ -1,0 +1,1109 @@
+---
+title: "Auto MPG Dataset Analysis: 1970-1982"
+subtitle: "A Comprehensive Statistical Study"
+author: "Ali Ahmadi, Ramez Chreide, Jawad Ahmed, Md Foyzullah"
+date: "`r Sys.Date()`"
+abstract: |
+  This report analyzes the Auto MPG dataset containing 398 vehicles manufactured between 1970 and 1982, a transformative period marked by significant shifts in automotive design driven by oil crises and fuel economy regulations. Our analysis reveals that engine displacement and vehicle weight are the primary mechanical drivers of fuel consumption, with both showing strong negative correlations with fuel efficiency. The data demonstrates clear regional manufacturing philosophies: American manufacturers focused on larger, heavier vehicles with powerful engines, while Japanese and European manufacturers prioritized compact, lightweight designs that achieved superior fuel economy.
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    df_print: paged
+  word_document:
+    toc: true
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# CLEAR ENVIRONMENT
+rm(list = ls(all.names = TRUE))
+
+# LOAD PACKAGES
+library(knitr)
+library(ggplot2)
+library(dplyr)
+
+# GLOBAL CHUNK OPTIONS
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE, 
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 6.5, 
+  fig.height = 3.5
+)
+
+# GGPLOT THEME
+theme_set(theme_minimal())
+```
+
+```{r load-and-prepare}
+# Read the CSV file - it's actually space/tab separated with quoted strings
+filename <- "auto-mpg.csv"
+
+# Read each line and parse manually
+lines <- readLines(filename)
+
+# Function to parse each line
+parse_line <- function(line) {
+  # Remove outer quotes
+  line <- gsub('^"|"$', '', line)
+  
+  # Split by whitespace (spaces or tabs)
+  parts <- strsplit(line, "\\s+")[[1]]
+  
+  # The last part is the car name (may have quotes)
+  car_name <- parts[length(parts)]
+  car_name <- gsub('^""|""$', '', car_name)
+  
+  # Numeric parts
+  nums <- as.numeric(parts[1:8])
+  
+  return(c(nums, car_name))
+}
+
+# Parse all lines
+parsed_data <- t(sapply(lines, parse_line))
+
+# Create data frame
+data <- as.data.frame(parsed_data, stringsAsFactors = FALSE)
+colnames(data) <- c("mpg", "cylinders", "displacement", "horsepower", "weight", 
+                    "acceleration", "model_year", "origin", "car_name")
+
+# Convert numeric columns
+data$mpg <- as.numeric(data$mpg)
+data$cylinders <- as.integer(data$cylinders)
+data$displacement <- as.numeric(data$displacement)
+data$horsepower <- as.numeric(data$horsepower)
+data$weight <- as.numeric(data$weight)
+data$acceleration <- as.numeric(data$acceleration)
+data$model_year <- as.integer(data$model_year)
+data$origin <- as.integer(data$origin)
+
+# Convert origin to meaningful labels
+data$origin <- factor(data$origin, 
+                      levels = c(1, 2, 3), 
+                      labels = c("USA", "Europe", "Japan"))
+
+# Create efficiency rank categories
+data$efficiency_rank <- cut(data$mpg, 
+                            breaks = quantile(data$mpg, probs = seq(0, 1, 0.25)), 
+                            include.lowest = TRUE,
+                            labels = c("Budget", "Standard", "Efficient", "Ultra Efficient"), 
+                            ordered_result = TRUE)
+
+# Create weight class categories
+data$weight_class <- cut(data$weight, 
+                         breaks = quantile(data$weight, probs = seq(0, 1, 0.25), na.rm = TRUE), 
+                         include.lowest = TRUE,
+                         labels = c("Lightweight", "Moderate", "Heavy", "Very Heavy"), 
+                         ordered_result = TRUE)
+
+# Create era categories for historical analysis
+data$era <- cut(data$model_year,
+                breaks = c(69, 73, 77, 82),
+                labels = c("Pre Oil Crisis", "Oil Crisis", "Post Crisis"))
+
+# Impute missing horsepower values with historically accurate values
+actual_hp <- c(75, 100, 51, 132, 81, 82)
+missing_indices <- which(is.na(data$horsepower))
+data$horsepower[missing_indices] <- actual_hp
+```
+\newpage
+
+# Introduction
+
+This report analyzes the Auto MPG dataset containing 398 vehicles manufactured between 1970 and 1982, a transformative period in automotive history. This era was fundamentally reshaped by external economic, political, and regulatory pressures that forced the industry to reconsider its priorities.
+
+## Historical Context and Significance
+
+The automotive industry during 1970-1982 faced unprecedented challenges that created a natural experiment in engineering adaptation. The 1973 Oil Crisis, triggered by the Arab oil embargo, caused petroleum prices to quadruple almost overnight, creating immediate economic shock across global markets. A second oil shock in 1979 following the Iranian Revolution reinforced the urgency of addressing fuel efficiency as a strategic priority rather than an afterthought.
+
+Simultaneously, environmental concerns materialized into concrete regulatory action. The Clean Air Act of 1970 imposed strict emission standards, forcing manufacturers to redesign engines and exhaust systems. The Corporate Average Fuel Economy (CAFE) standards, enacted in 1975, mandated minimum fleet-wide fuel efficiency targets, compelling manufacturers to balance performance desires with regulatory compliance.
+
+These converging pressures created a remarkable period where manufacturers faced identical external forces but responded dramatically differently based on regional priorities, existing infrastructure, and engineering philosophies.
+
+## Dataset Overview and Structure
+
+The Auto MPG dataset provides comprehensive technical specifications for each vehicle, enabling systematic investigation of mechanical relationships and regional design strategies. Key variables include:
+
+- **Engine Displacement** (cubic inches): Total cylinder volume, primary indicator of engine size
+- **Cylinders**: Number of engine cylinders (3, 4, 5, 6, 8)
+- **Horsepower**: Engine power output
+- **Weight** (pounds): Vehicle curb weight
+- **Acceleration** (seconds): Time to reach 60 mph from standstill
+- **Model Year**: Manufacturing year (1970-1982)
+- **MPG**: Fuel efficiency (miles per gallon)
+- **Origin**: Manufacturing region (USA, Europe, Japan)
+
+The dataset's temporal span (1970-1982) captures the industry's evolution from the pre-crisis performance focus through the crisis adaptation period and into the post-crisis efficiency era.
+
+## Research Questions and Analytical Framework
+
+This analysis addresses three fundamental questions:
+
+1. **What are the primary mechanical drivers of fuel efficiency?** We investigate correlations between physical vehicle characteristics (weight, displacement, power) and fuel economy to identify which engineering parameters most strongly influence efficiency.
+
+2. **How did regional manufacturers respond to the oil crises?** We examine differences in vehicle specifications and efficiency achievements across USA, European, and Japanese manufacturers to understand distinct engineering philosophies and adaptation strategies.
+
+3. **What performance trade-offs occurred during this transformational period?** We analyze temporal trends in power, acceleration, and efficiency to quantify the systematic shift from performance to efficiency priorities.
+
+The analysis proceeds through univariate examination of key variables, followed by bivariate relationships that reveal mechanical principles, regional differences, and historical trends. Finally, we discuss findings' validity and contemporary relevance.
+
+\newpage
+
+# Univariate Analysis
+
+## Dataset Structure by Model Year
+
+```{r year-structure, fig.cap="Distribution of Vehicles by Model Year"}
+barplot(table(data$model_year),
+        col = "gray40",
+        border = NA,
+        main = "Cars by Model Year",
+        xlab = "Model Year",
+        ylab = "Number of Cars")
+```
+
+The number of vehicles per model year is relatively stable, ranging from 29 to 36 vehicles annually. No single year dominates the dataset, which supports meaningful temporal comparisons and trend analysis across the entire period.
+
+## Fuel Efficiency (MPG)
+
+```{r mpg-analysis, fig.cap="MPG Distribution and Outlier Analysis"}
+par(mfrow = c(1, 2), mar = c(5, 5, 4, 2), las = 1)
+
+hist(data$mpg,
+     breaks = 20,
+     col = "#5DA5DA",
+     border = "white",
+     main = "MPG Distribution",
+     xlab = "Miles per Gallon",
+     ylab = "Number of Cars")
+
+abline(v = mean(data$mpg), col = "red", lwd = 2, lty = 2)
+abline(v = median(data$mpg), col = "blue", lwd = 2)
+
+legend("topright",
+       legend = c("Mean", "Median"),
+       col = c("red", "blue"),
+       lty = c(2, 1),
+       lwd = 2)
+
+boxplot(data$mpg,
+        col = "#5DA5DA",
+        main = "MPG Outliers",
+        ylab = "Miles per Gallon")
+```
+
+**Summary Statistics:**
+
+- Mean MPG: `r round(mean(data$mpg), 2)`
+- Median MPG: `r round(median(data$mpg), 2)`
+- Standard Deviation: `r round(sd(data$mpg), 2)`
+- Range: `r round(min(data$mpg), 1)` - `r round(max(data$mpg), 1)` MPG
+
+**Interpretation:** The MPG distribution exhibits right skewness, with most vehicles clustered between the mid-teens and mid-twenties MPG range. A smaller number of highly efficient vehicles extend the distribution toward the upper end, representing early adopters of fuel economy technologies and lightweight designs. The median lying below the mean indicates that high-MPG vehicles pull the average upward, making the median a more representative summary of typical fuel efficiency in this era.
+
+## Horsepower
+
+```{r hp-analysis, fig.cap="Horsepower Distribution and Outliers"}
+par(mfrow = c(1, 2), mar = c(5, 5, 4, 2), las = 1)
+
+hist(data$horsepower,
+     breaks = 25,
+     col = "#60BD68",
+     border = "white",
+     main = "Horsepower Distribution",
+     xlab = "Horsepower",
+     ylab = "Number of Cars")
+
+abline(v = mean(data$horsepower), col = "red", lwd = 2, lty = 2)
+abline(v = median(data$horsepower), col = "blue", lwd = 2)
+
+legend("topright",
+       legend = c("Mean", "Median"),
+       col = c("red", "blue"),
+       lty = c(2, 1),
+       lwd = 2)
+
+boxplot(data$horsepower,
+        col = "#60BD68",
+        main = "Horsepower Outliers",
+        ylab = "Horsepower")
+```
+
+**Summary Statistics:**
+
+- Mean Horsepower: `r round(mean(data$horsepower), 2)`
+- Median Horsepower: `r round(median(data$horsepower), 2)`
+
+**Interpretation:** Horsepower exhibits strong right skewness, with most vehicles concentrated below approximately 120 horsepower. A smaller number of high-performance vehicles with power outputs exceeding 200 HP extend far to the right, creating a long tail. These extreme values exert strong influence on the mean, making robust summaries such as the median and interquartile range more informative for characterizing typical vehicles in the dataset.
+
+## Engine Displacement (Jawad's Analysis)
+
+```{r displacement-analysis, fig.cap="Engine Displacement Distribution and Outliers"}
+mean_val   <- mean(data$displacement)
+median_val <- median(data$displacement)
+sd_val     <- sd(data$displacement)
+q1_val     <- quantile(data$displacement, 0.25)
+q3_val     <- quantile(data$displacement, 0.75)
+
+Q1 <- quantile(data$displacement, 0.25)
+Q3 <- quantile(data$displacement, 0.75)
+IQR_val <- Q3 - Q1
+
+lower_fence <- Q1 - (1.5 * IQR_val)
+upper_fence <- Q3 + (1.5 * IQR_val)
+
+outliers <- data$displacement[data$displacement < lower_fence | 
+                                data$displacement > upper_fence]
+
+par(mfrow = c(1, 2))
+
+hist(data$displacement,
+     main = "Distribution of Displacement",
+     xlab = "Engine Displacement (cu. in.)",
+     ylab = "Frequency",
+     col = "#4682B4",
+     border = "white",
+     breaks = 25)
+
+abline(v = median_val, col = "navy", lwd = 3, lty = 3)
+abline(v = mean_val, col = "darkred", lwd = 3, lty = 2)
+
+legend("topright",
+       legend = c("Median", "Mean"),
+       col = c("navy", "darkred"),
+       lty = c(3, 2), lwd = 3, cex = 0.8, bty = "n")
+
+boxplot(data$displacement,
+        horizontal = FALSE,  
+        main = "Boxplot of Displacement",
+        ylab = "Engine Displacement (cu. in.)",
+        col = "#87CEFA",
+        border = "black",
+        pch = 19)
+
+par(mfrow = c(1, 1))
+```
+
+**Key Statistics:**
+
+- **Mean:** `r round(mean_val, 2)` cu. in.
+- **Median:** `r round(median_val, 2)` cu. in.
+- **Standard Deviation:** `r round(sd_val, 2)` cu. in.
+- **Q1 (25th percentile):** `r round(q1_val, 2)` cu. in.
+- **Q3 (75th percentile):** `r round(q3_val, 2)` cu. in.
+- **Upper Fence (Outlier Boundary):** `r round(upper_fence, 2)` cu. in.
+- **Number of Outliers:** `r length(outliers)`
+
+**Interpretation:** The distribution shows pronounced right skewness with the mean (193.4 cu.in) significantly exceeding the median (148.5 cu.in), indicating a market divided between small economy engines and large displacement performance engines. The large standard deviation (104.3 cu.in) reflects the wide variation in engine sizes available during this period, from compact 4-cylinder engines under 100 cubic inches to massive V8 engines exceeding 400 cubic inches.
+
+The boxplot reveals that most displacement values range from Q1 (104 cu.in) to Q3 (262 cu.in), representing a typical spread of approximately 158 cubic inches. Remarkably, although the histogram shows clear right skewness, the boxplot detects zero statistical outliers because the variability in 1970s engine sizes was so immense that even the largest engines (455 cu.in) fall within the statistical upper boundary of 1.5 × IQR above Q3.
+
+```{r dead-zones}
+h <- hist(data$displacement, breaks = 25, plot = FALSE)
+bins_info <- data.frame(
+  Start = h$breaks[1:length(h$counts)], 
+  End   = h$breaks[2:length(h$breaks)], 
+  Count = h$counts
+)
+
+dead_zones <- bins_info[bins_info$Count == 0, ]
+```
+
+**Dead Zones Analysis:** The histogram reveals specific "dead zones" where no engines were produced. These gaps occur particularly in the ranges of 200-220, 280-300, 360-380, and 400-420 cubic inches. This pattern reflects the automotive industry's tendency to cluster around popular, standardized engine sizes (e.g., 250, 302, 350 cu.in) rather than filling every possible displacement value. Manufacturers optimized tooling and production around these conventional sizes, creating distinct gaps in the distribution rather than a smooth continuum.
+
+## Acceleration (Ali's Analysis - Continuous Variable)
+
+### Summary Statistics
+
+```{r acceleration-summary}
+# Calculate key statistics
+acc_mean <- mean(data$acceleration, na.rm = TRUE)
+acc_median <- median(data$acceleration, na.rm = TRUE)
+acc_sd <- sd(data$acceleration, na.rm = TRUE)
+acc_min <- min(data$acceleration, na.rm = TRUE)
+acc_max <- max(data$acceleration, na.rm = TRUE)
+acc_q1 <- quantile(data$acceleration, 0.25, na.rm = TRUE)
+acc_q3 <- quantile(data$acceleration, 0.75, na.rm = TRUE)
+acc_iqr <- IQR(data$acceleration, na.rm = TRUE)
+
+cat("Acceleration Statistics (seconds to 60 mph):\n")
+cat("Mean:", round(acc_mean, 2), "\n")
+cat("Median:", round(acc_median, 2), "\n")
+cat("Standard Deviation:", round(acc_sd, 2), "\n")
+cat("Range:", acc_min, "-", acc_max, "\n")
+cat("Q1:", round(acc_q1, 2), "\n")
+cat("Q3:", round(acc_q3, 2), "\n")
+cat("IQR:", round(acc_iqr, 2), "\n")
+```
+
+**Interpretation:**
+
+- Mean acceleration time is 15.54 seconds, with a median of 15.50 seconds (very close values, suggesting symmetric distribution)
+- Standard deviation of 2.76 seconds indicates moderate variability in acceleration performance
+- Range spans from 8.0 seconds (high-performance sports cars) to 24.8 seconds (heavy economy vehicles)
+- The IQR shows that the middle 50% of cars accelerate between 13.78 and 17.02 seconds
+
+### Visualization
+
+```{r acceleration-histogram, fig.cap="Acceleration Distribution and Boxplot Analysis"}
+par(mfrow = c(1, 2))
+
+# Histogram
+hist(data$acceleration, 
+     breaks = 20,
+     main = "Distribution of Acceleration Times",
+     xlab = "Acceleration (seconds to 60 mph)",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "black")
+abline(v = acc_mean, col = "red", lwd = 2, lty = 2)
+abline(v = acc_median, col = "blue", lwd = 2, lty = 2)
+legend("topright", 
+       legend = c("Mean", "Median"), 
+       col = c("red", "blue"), 
+       lwd = 2, lty = 2)
+
+# Boxplot
+boxplot(data$acceleration,
+        main = "Acceleration Boxplot",
+        ylab = "Acceleration (seconds)",
+        col = "lightgreen",
+        border = "black")
+```
+
+**Key Observations:**
+
+- Distribution is approximately normal with slight right skew
+- Mean and median are nearly identical, confirming the symmetric center of the distribution
+- Few outliers exist on the high end, representing very slow accelerating vehicles
+- Most cars cluster around the 14-17 second range, representing typical performance for the era
+
+## Cylinders (Ali's Analysis - Discrete Variable)
+
+### Frequency Distribution
+
+```{r cylinders-frequency}
+# Frequency table
+cyl_freq <- table(data$cylinders)
+cyl_rel_freq <- prop.table(cyl_freq)
+
+cat("Cylinder Distribution:\n")
+cat("\nAbsolute Frequencies:\n")
+print(cyl_freq)
+
+cat("\nRelative Frequencies (Proportions):\n")
+print(round(cyl_rel_freq, 3))
+
+cat("\nPercentage Distribution:\n")
+print(round(cyl_rel_freq * 100, 1))
+```
+
+**Interpretation:**
+
+- 4-cylinder engines dominate the dataset (~51%), representing the standard configuration for economy and compact vehicles
+- 8-cylinder engines are the second most common (~26%), reflecting American manufacturers' traditional preference for large, powerful engines
+- 6-cylinder engines account for ~21%, serving as a middle ground offering balanced performance and efficiency
+- 3-cylinder and 5-cylinder engines are rare (combined < 2%), representing experimental or specialized designs
+- Clear market preference for even-numbered cylinder configurations (4, 6, 8) due to superior engine balance and smoother operation
+
+### Visualization
+
+```{r cylinders-barplot, fig.cap="Cylinder Count Distribution"}
+par(mfrow = c(1, 2))
+
+# Bar chart - absolute frequencies
+barplot(cyl_freq,
+        main = "Cylinder Count Distribution",
+        xlab = "Number of Cylinders",
+        ylab = "Count",
+        col = c("steelblue1", "steelblue2", "steelblue3", "steelblue4", "navy"),
+        border = "black")
+
+# Bar chart - percentages
+barplot(cyl_rel_freq * 100,
+        main = "Cylinder Count (Percentage)",
+        xlab = "Number of Cylinders",
+        ylab = "Percentage (%)",
+        col = c("steelblue1", "steelblue2", "steelblue3", "steelblue4", "navy"),
+        border = "black",
+        ylim = c(0, 60))
+```
+
+**Key Insights:**
+
+- 4-cylinder engines represent the industry standard for economy vehicles, particularly prominent among Japanese and European manufacturers
+- 8-cylinder engines represent the traditional American muscle/luxury segment, prioritizing power over efficiency
+- 6-cylinder engines serve as the middle ground, balancing performance desires with reasonable fuel economy
+
+## Vehicle Weight (Faiyaz's Analysis)
+
+```{r univariate-vweight, fig.cap="Vehicle Weight Distribution"}
+hist(data$weight, 
+     col = "#a6cee3", 
+     border = "white",
+     main = "Distribution of Vehicle Weight", 
+     xlab = "Weight (lbs)")
+abline(v = mean(data$weight), col = "red", lwd = 2, lty = 2)  
+abline(v = median(data$weight), col = "blue", lwd = 2, lty = 3)
+legend("topright", 
+       legend = c(paste("Mean:", round(mean(data$weight), 0)), 
+                  paste("Median:", round(median(data$weight), 0))), 
+       col = c("red", "blue"), lty = 2:3, lwd = 2, bty = "n")
+```
+
+**Findings:** Weight exhibits a right-skewed distribution with a mean of `r round(mean(data$weight), 0)` pounds, highlighting the high frequency of heavy vehicles characteristic of this era. The distribution reflects the dominance of large American vehicles in the dataset, with substantial mass representing the engineering philosophy of the period that prioritized size, comfort, and power over efficiency.
+
+## Manufacturing Origin (Faiyaz's Analysis - Nominal)
+
+```{r univariate-origin, fig.cap="Manufacturing Origin Distribution"}
+sorted_origin <- sort(table(data$origin), decreasing = TRUE)
+barplot(sorted_origin, 
+        col = c("#1b9e77", "#d95f02", "#7570b3"),
+        main = "Manufacturing Origin (Sorted)", 
+        ylab = "Number of Vehicles", 
+        border = "white")
+```
+
+**Findings:** The dataset is heavily dominated by USA manufacturers (249 vehicles, 62.6%), providing a substantial baseline for comparison. Japanese manufacturers contribute 79 vehicles (19.8%), while European manufacturers provide 70 vehicles (17.6%). This distribution reflects the global automotive market share during the 1970s-1980s period, where American manufacturers still held domestic dominance despite increasing foreign competition spurred by superior fuel efficiency.
+
+## Weight Class Distribution (Jawad's Analysis)
+
+```{r weight-class-analysis, fig.cap="Count and Proportion of Vehicles by Weight Class"}
+weight_counts <- table(data$weight_class)
+weight_pct    <- round(prop.table(weight_counts) * 100, 1)
+
+par(mfrow = c(1, 2))
+
+# Left: Count
+bp1 <- barplot(weight_counts,
+               main = "Count of Cars by Weight Class",
+               xlab = "Weight Class",
+               ylab = "Count",
+               col = "#4682B4", 
+               ylim = c(0, max(weight_counts) * 1.2))
+
+text(x = bp1, y = weight_counts, 
+     labels = weight_counts, 
+     pos = 3, cex = 0.8, col = "black")
+
+# Right: Percentage
+bp2 <- barplot(weight_pct,
+               main = "Proportion of Cars by Weight Class",
+               xlab = "Weight Class",
+               ylab = "Percentage (%)",
+               col = "#4682B4", 
+               ylim = c(0, 40))
+
+text(x = bp2, y = weight_pct, 
+     labels = paste0(weight_pct, "%"), 
+     pos = 3, cex = 0.8, col = "black")
+
+par(mfrow = c(1, 1))
+```
+
+**Interpretation:** The bar charts demonstrate an approximately equal distribution across all four weight classes, with each category containing around 25% of vehicles (approximately 100 cars each). This balanced distribution is by design, as the weight classes were created using quartile breaks which intentionally divide the data into four equal groups. The equal representation across weight categories facilitates robust statistical comparisons and ensures no single weight class dominates the analysis.
+
+## Efficiency Rank (Faiyaz's Analysis - Ordinal)
+
+```{r univariate-erank, fig.cap="Fleet Distribution by Efficiency Rank"}
+sorted_rank <- sort(table(data$efficiency_rank), decreasing = TRUE)
+barplot(sorted_rank, 
+        col = terrain.colors(4),
+        main = "Fleet Distribution by Efficiency Rank (Sorted)", 
+        ylab = "Number of Vehicles", 
+        border = "white",
+        las = 1)
+```
+
+**Findings:** The distribution shows that most vehicles fall into the "Standard" or "Budget" efficiency tiers, representing the mainstream market's focus on conventional designs during this period. The "Ultra Efficient" category represents the top 25% of vehicles by MPG, comprising approximately 100 vehicles that achieved fuel economy significantly above the median. These high-efficiency vehicles disproportionately represent Japanese and European manufacturers who prioritized lightweight construction and smaller engine displacement, foreshadowing the industry's future direction.
+
+\newpage
+
+# Bivariate Analysis
+
+## Horsepower vs Acceleration (Ali's Analysis - Continuous vs Continuous)
+
+### Visualization
+
+```{r hp-acc-plot, fig.cap="Scatterplot: Horsepower vs Acceleration with Regression Line"}
+plot(data$horsepower, data$acceleration,
+     main = "Scatterplot: Horsepower vs. Acceleration",
+     xlab = "Horsepower (HP)",
+     ylab = "Acceleration (seconds to 60 mph)",
+     pch = 19, col = "darkred")
+
+# Add linear trend line
+abline(lm(acceleration ~ horsepower, data = data), col = "blue", lwd = 2)
+```
+
+**Key Observations:**
+
+- Clear negative linear relationship between horsepower and acceleration time
+- Higher horsepower engines accelerate faster, resulting in lower (better) acceleration time values
+- Blue trend line shows the average decrease in acceleration time per unit increase in horsepower
+- Scatter around the line indicates that horsepower alone doesn't completely determine acceleration—other factors like weight, transmission type, and aerodynamics also play roles
+
+### Correlation Analysis
+
+```{r hp-acc-correlation}
+# Measure linear strength
+cor_pearson_hp <- cor(data$horsepower, data$acceleration, method = "pearson")
+cat("Pearson Correlation (r):", round(cor_pearson_hp, 3), "\n")
+
+cor_spearman_hp <- cor(data$horsepower, data$acceleration, method = "spearman")
+cat("Spearman Correlation (rho):", round(cor_spearman_hp, 3), "\n")
+```
+
+Both correlations show strong negative relationships:
+
+- **Pearson r = -0.689**: Indicates a strong linear association between horsepower and acceleration. Approximately 47% of the variance in acceleration time can be explained by horsepower alone (r² = 0.475).
+- **Spearman rho = -0.686**: Confirms the strong monotonic relationship, nearly identical to Pearson correlation, suggesting the relationship is consistently linear without major non-linear components or influential outliers distorting the pattern.
+
+**Interpretation:** The strong negative correlation validates the fundamental mechanical principle that engine power translates directly to acceleration performance. Each additional horsepower unit contributes to faster acceleration, though with diminishing marginal returns at higher power levels. This relationship demonstrates the direct connection between engine output and vehicle dynamics, confirming that power remains the primary determinant of straight-line acceleration performance.
+
+## Displacement vs Cylinders (Ali's Analysis - Continuous vs Discrete)
+
+### Visualization
+
+```{r disp-cyl-boxplot, fig.cap="Engine Displacement Distribution by Cylinder Count"}
+boxplot(displacement ~ cylinders, data = data,
+        main = "Engine Displacement by Cylinder Count",
+        xlab = "Number of Cylinders",
+        ylab = "Displacement (cubic inches)",
+        col = c("lightblue", "lightgreen", "lightyellow", "lightpink", "lavender"),
+        border = "black",
+        varwidth = TRUE)
+
+# Add group means as red points
+means <- tapply(data$displacement, data$cylinders, mean, na.rm = TRUE)
+points(1:length(means), means, pch = 19, col = "red", cex = 1.5)
+legend("topleft", legend = "Group Mean", pch = 19, col = "red")
+```
+
+**Key Observations:**
+
+- Clear progression: median displacement increases systematically with cylinder count
+- Distinct separation between cylinder groups with minimal overlap between adjacent categories
+- Red points (group means) show the average displacement for each cylinder configuration
+- Box widths (varwidth=TRUE) reflect the different sample sizes, with 4-cylinder being most common
+- Increasing variability (box height) in higher cylinder counts reflects greater diversity in large engine designs
+
+### Group Statistics
+
+```{r disp-cyl-stats}
+# Calculate statistics for each cylinder group
+disp_stats <- data %>%
+  group_by(cylinders) %>%
+  summarise(
+    Count = n(),
+    Mean = round(mean(displacement, na.rm = TRUE), 1),
+    Median = round(median(displacement, na.rm = TRUE), 1),
+    SD = round(sd(displacement, na.rm = TRUE), 1)
+  )
+
+kable(disp_stats, 
+      caption = "Displacement Statistics by Cylinder Group",
+      col.names = c("Cylinders", "n", "Mean", "Median", "SD"),
+      format = "markdown")
+```
+
+**Interpretation:**
+
+- **3-cylinder:** Mean = 72.5 cu.in (ultra-compact economy cars, rare in this dataset)
+- **4-cylinder:** Mean = 110.0 cu.in (standard compact vehicles, most common configuration)
+- **6-cylinder:** Mean = 218.0 cu.in (mid-size vehicles, balanced performance and efficiency)
+- **8-cylinder:** Mean = 345.0 cu.in (full-size and performance vehicles, traditional American preference)
+
+The systematic progression validates the geometric scaling principle: more cylinders necessitate proportionally larger total displacement to maintain proper cylinder sizing. The approximate doubling of mean displacement from 4 to 8 cylinders (110 to 345 cu.in) reflects the engineering constraint that larger engines require more cylinders to maintain acceptable individual cylinder dimensions and avoid excessive piston stroke.
+
+## Acceleration vs Model Year (Ali's Analysis - Continuous vs Discrete)
+
+### Visualization
+
+```{r acc-year-boxplot, fig.cap="Acceleration Performance by Model Year"}
+par(mfrow = c(1, 2))
+
+# Boxplot by year
+boxplot(acceleration ~ model_year, data = data,
+        main = "Acceleration by Model Year",
+        xlab = "Model Year",
+        ylab = "Acceleration (seconds)",
+        col = "lightcoral",
+        las = 2,
+        cex.axis = 0.7)
+
+# Scatterplot with yearly means
+plot(data$model_year, data$acceleration,
+     main = "Acceleration Trend Over Time",
+     xlab = "Model Year",
+     ylab = "Acceleration (seconds)",
+     pch = 19, col = rgb(0, 0, 1, 0.3))
+yearly_means <- aggregate(acceleration ~ model_year, data = data, FUN = mean)
+lines(yearly_means$model_year, yearly_means$acceleration, col = "red", lwd = 2)
+```
+
+**Key Observations:**
+
+- Clear upward trend in acceleration times, indicating cars getting progressively slower throughout the decade
+- Red trend line shows systematic performance decline, particularly steep between 1973-1975 (oil crisis period)
+- Individual points (blue dots) show substantial variation within each year, but the overall trend is unmistakable
+- Later years show wider spread in acceleration times, reflecting diversification in market offerings
+
+### Decade Comparison
+
+```{r historical-comparison}
+# Compare early decade (1970-1974) vs late decade (1978-1982)
+# Note: model_year is stored as 70, 71, 72... not 1970, 1971, 1972...
+early_decade <- data %>%
+  filter(model_year >= 70 & model_year <= 74) %>%
+  summarise(Mean_Acc = round(mean(acceleration), 2),
+            Mean_HP = round(mean(horsepower), 1),
+            Mean_MPG = round(mean(mpg), 1))
+
+late_decade <- data %>%
+  filter(model_year >= 78 & model_year <= 82) %>%
+  summarise(Mean_Acc = round(mean(acceleration), 2),
+            Mean_HP = round(mean(horsepower), 1),
+            Mean_MPG = round(mean(mpg), 1))
+
+comparison <- data.frame(
+  Period = c("Early 1970s (1970-1974)", "Late Decade (1978-1982)", "Change (%)"),
+  Acceleration = c(early_decade$Mean_Acc, late_decade$Mean_Acc, 
+                   round((late_decade$Mean_Acc - early_decade$Mean_Acc) / early_decade$Mean_Acc * 100, 1)),
+  Horsepower = c(early_decade$Mean_HP, late_decade$Mean_HP,
+                 round((late_decade$Mean_HP - early_decade$Mean_HP) / early_decade$Mean_HP * 100, 1)),
+  MPG = c(early_decade$Mean_MPG, late_decade$Mean_MPG,
+          round((late_decade$Mean_MPG - early_decade$Mean_MPG) / early_decade$Mean_MPG * 100, 1))
+)
+
+kable(comparison, 
+      caption = "Decade Comparison: Early 1970s vs Late 1970s/Early 1980s",
+      col.names = c("Period", "Acceleration (s)", "Horsepower", "MPG"),
+      format = "markdown")
+```
+
+**Historical Context:**
+
+Cars became **11% slower** (acceleration time increased from 14.7 to 16.3 seconds) while simultaneously improving fuel economy by **50%** (from 19.3 to 28.8 MPG). This dramatic trade-off reflects three major forces:
+
+1. **1973 & 1979 Oil Crises:** Forced immediate market demand shift toward fuel efficiency over performance
+2. **Clean Air Act (1970) emission regulations:** Required catalytic converters and engine detuning, reducing power output
+3. **CAFE Standards (1975):** Mandated fleet-wide minimum fuel efficiency, compelling manufacturers to prioritize MPG over horsepower
+
+The 26% decline in horsepower (121 to 89 HP) directly explains the acceleration performance degradation. Manufacturers systematically reduced engine displacement, implemented emission control systems that sacrificed power, and shifted market offerings toward smaller, lighter vehicles. This period represents the most rapid transformation in automotive priorities in industry history, driven entirely by external regulatory and economic pressures rather than voluntary manufacturer initiative.
+
+## MPG vs Displacement (Jawad's Analysis - Continuous vs Continuous)
+
+```{r mpg-displacement-analysis, fig.cap="Relationship Between MPG and Engine Displacement"}
+cor_pearson <- cor(data$displacement, data$mpg, method = "pearson")
+cor_spearman <- cor(data$displacement, data$mpg, method = "spearman")
+
+plot(data$displacement, data$mpg,
+     main = "Scatterplot: MPG vs. Displacement",
+     xlab = "Engine Displacement (cu. in.)",
+     ylab = "Miles Per Gallon (mpg)",
+     pch = 19, col = "blue")
+
+abline(lm(mpg ~ displacement, data = data), col = "red", lwd = 2)
+```
+
+**Correlation Analysis:**
+
+- **Pearson Correlation (r):** `r round(cor_pearson, 2)`
+- **Spearman Correlation (rho):** `r round(cor_spearman, 2)`
+
+**Interpretation:** The scatterplot demonstrates a strong inverse relationship between engine size and fuel efficiency, with the red trend line showing consistent decline in MPG as displacement increases. The very strong negative correlations (both near -0.80) confirm that larger engines consistently produce lower MPG values. The Spearman correlation being slightly higher than Pearson suggests a modest non-linear monotonic component to the relationship—the MPG penalty for increasing displacement may be slightly steeper at the lower displacement range.
+
+This relationship validates fundamental thermodynamic principles: larger displacement engines burn more fuel per combustion cycle, require more energy to overcome internal friction, and typically power heavier vehicles that demand additional energy for motion. The correlation strength demonstrates that engine displacement is one of the single most important predictors of fuel efficiency, second only to vehicle weight.
+
+## Weight vs MPG: The Mass Penalty (Faiyaz's Analysis - Numeric to Numeric)
+
+```{r task-1, fig.cap="Weight vs MPG: Demonstrating the Mass Penalty"}
+plot(data$weight, data$mpg, 
+     main = "Weight vs. MPG (The Mass Penalty)",
+     xlab = "Vehicle Weight (lbs)", ylab = "MPG", 
+     pch = 19, col = rgb(0, 0, 1, 0.3), bty = "l")
+abline(lm(mpg ~ weight, data = data), col = "red", lwd = 2)
+```
+
+**Finding:** The scatter plot reveals a powerful inverse relationship between vehicle mass and fuel economy, demonstrating what we term the "Mass Penalty." The calculated Pearson correlation coefficient is **r = -0.832**, indicating a very strong negative linear relationship.
+
+**Physical Interpretation:** This result mathematically confirms the "Mass Penalty"—for every pound added to a vehicle's curb weight, there is a predictable and significant drop in fuel economy. This relationship stems from fundamental physics: heavier vehicles require more energy to accelerate, more energy to maintain speed against rolling resistance, and more energy to overcome inertia during speed changes. The correlation strength demonstrates that vehicle weight is arguably the single most important mechanical predictor of fuel efficiency, even more influential than engine characteristics in isolation.
+
+## Efficiency vs Power (Ramez's Analysis - Continuous vs Continuous)
+
+```{r efficiency-power, fig.cap="Relationship Between Efficiency and Engine Power"}
+par(mfrow = c(1, 2))
+
+plot(data$horsepower,
+     data$mpg,
+     pch = 19,
+     col = rgb(0, 0, 0, 0.3),
+     bty = "l",
+     main = "Efficiency vs Power",
+     xlab = "Horsepower",
+     ylab = "MPG")
+
+lines(lowess(data$horsepower, data$mpg),
+      col = "#F15854",
+      lwd = 2)
+
+plot(data$model_year,
+     data$mpg,
+     pch = 19,
+     col = rgb(0, 0, 0, 0.3),
+     bty = "l",
+     main = "MPG Over Time",
+     xlab = "Model Year",
+     ylab = "MPG")
+
+lines(lowess(data$model_year, data$mpg),
+      col = "#5DA5DA",
+      lwd = 2)
+```
+
+**Spearman Correlation:** `r round(cor(data$horsepower, data$mpg, method="spearman"), 3)`
+
+**Interpretation (Left Plot):** Fuel efficiency declines as horsepower increases, following a clearly non-linear pattern. Initial increases in horsepower impose a large MPG penalty (steep decline from 50-100 HP), while further increases at high power levels reduce MPG more gradually (flatter decline above 150 HP). The LOWESS smoothing curve reveals this non-linearity more clearly than a simple linear regression would, showing that the marginal efficiency cost of additional horsepower diminishes at high power levels, possibly due to engineering optimizations in high-performance engines.
+
+**Interpretation (Right Plot):** MPG increases steadily from 1970 through the early 1980s, with the upward curvature suggesting accelerating efficiency improvements after the mid-1970s. The LOWESS curve shows a modest increase from 1970-1973, followed by steeper gains from 1973-1982, perfectly aligned with the oil crisis timeline and CAFE standards implementation. This temporal pattern validates the historical narrative that external pressures drove rapid efficiency innovation.
+
+## Horsepower Over Time (Ramez's Analysis)
+
+```{r horsepower-over-time, fig.cap="Horsepower Decline Over the Decade"}
+plot(data$model_year,
+     data$horsepower,
+     pch = 19,
+     col = rgb(0, 0, 0, 0.3),
+     bty = "l",
+     main = "Horsepower Over Time",
+     xlab = "Model Year",
+     ylab = "Horsepower")
+
+lines(lowess(data$model_year, data$horsepower),
+      col = "#F15854",
+      lwd = 2)
+```
+
+**Investigation:** This analysis investigates whether engine power declined systematically over time as manufacturers increasingly prioritized fuel efficiency during the oil crisis period. Horsepower is treated as a continuous variable, while model year functions as a discrete, ordered temporal variable representing the progression of regulatory and market pressures.
+
+**Finding:** The plot displays individual vehicles for each year along with a LOWESS smooth trend line that captures changes in typical horsepower over time. The red curve shows a clear and substantial decline from approximately 130 HP average in 1970 to roughly 80 HP average by 1982—a 38% reduction in mean horsepower over the 12-year period. This systematic power reduction reflects manufacturers' response to emission regulations (which required engine detuning), CAFE standards (which encouraged smaller engines), and market demand shift (as consumers prioritized fuel economy over performance following oil price shocks).
+
+## MPG by Manufacturing Origin (Faiyaz's Analysis - Numeric to Nominal)
+
+```{r task-4-2, fig.cap="Fuel Economy Distributions by Manufacturing Region"}
+boxplot(mpg ~ origin, data = data, 
+        main = "Fuel Economy Distributions by Origin",
+        xlab = "Manufacturing Region", ylab = "MPG", 
+        col = c("tomato", "lightgreen", "lightblue"))
+```
+
+**Finding:** When vehicles are categorized by manufacturing origin, the regional engineering divide becomes immediately apparent. Japanese and European manufacturers maintained significantly higher median MPG levels compared to American firms:
+
+- **USA:** Median ≈ 18.5 MPG, IQR ≈ 15-22 MPG
+- **Europe:** Median ≈ 26.5 MPG, IQR ≈ 23-30 MPG  
+- **Japan:** Median ≈ 31.6 MPG, IQR ≈ 28-35 MPG
+
+**Strategic Response:** Japanese vehicles achieved approximately 70% higher fuel efficiency than American vehicles (31.6 vs 18.5 MPG median), while European vehicles fell in the middle at 43% higher than American (26.5 vs 18.5 MPG). This dramatic divergence reflects fundamentally different engineering philosophies: foreign manufacturers effectively responded to global fuel crises by engineering lighter vehicles with smaller displacement engines that avoided the heaviest mass penalties documented in the weight-MPG analysis, while American manufacturers maintained their traditional focus on larger, heavier vehicles with more powerful engines.
+
+## Origin vs Weight Class (Jawad's Analysis - Nominal vs Ordinal)
+
+```{r origin-weight-analysis, fig.cap="Car Weight Distribution by Manufacturing Origin"}
+counts <- table(data$origin, data$weight_class)
+row_freq <- prop.table(counts, margin = 1)
+plot_data <- t(row_freq) * 100
+
+cols <- c("#2c7bb6", "#abd9e9", "#fdae61", "#d7191c")
+
+bp <- barplot(plot_data, 
+              beside = TRUE,      
+              main = "Car Weight Distribution by Origin",
+              xlab = "Origin",
+              ylab = "Percentage (%)",
+              col = cols, 
+              border = "white",
+              legend.text = TRUE, 
+              args.legend = list(x = "top", bty = "n", inset = -0.05, horiz = TRUE),
+              ylim = c(0, 115))
+
+text(x = bp, 
+     y = plot_data, 
+     labels = paste0(round(plot_data, 0), "%"), 
+     pos = 3, 
+     cex = 0.7, 
+     col = "black")
+```
+
+**Distribution by Region (%):**
+
+```{r origin-weight-table}
+kable(round(row_freq * 100, 1), 
+      caption = "Weight Class Distribution by Origin (%)",
+      format = "markdown")
+```
+
+**Interpretation:** The grouped bar chart reveals stark regional differences in vehicle weight distribution:
+
+- **USA:** Clear preference for heavy vehicles, with 40% in the "Very Heavy" category and only 11% in "Lightweight." This reflects the American automotive industry's traditional emphasis on large displacement engines, body-on-frame construction, and spacious interiors prioritizing comfort and power over efficiency.
+
+- **Japan:** Overwhelming focus on lightweight designs, with 56% of vehicles in the "Lightweight" category and only 3% in "Very Heavy." This distribution demonstrates Japanese manufacturers' strategic commitment to minimizing vehicle mass as the primary pathway to fuel efficiency, enabled by unibody construction, smaller engines, and compact dimensions.
+
+- **Europe:** More balanced distribution across weight categories, though still favoring lighter vehicles with 37% in "Lightweight" and 21% in "Heavy." European manufacturers occupied the middle ground, producing both compact economy cars and larger luxury vehicles, reflecting diverse market demands across multiple countries with varying fuel prices and regulatory environments.
+
+The contrasting weight distributions directly explain the regional MPG differences documented in previous analyses. Japanese manufacturers' dominance in lightweight vehicles enabled their superior fuel economy achievements, while American manufacturers' concentration in heavy vehicle segments imposed unavoidable mass penalties on efficiency.
+
+## Weight Class vs Efficiency Rank (Jawad's Analysis - Ordinal vs Ordinal)
+
+```{r weight-efficiency-analysis, fig.cap="Fuel Efficiency Distribution by Weight Class"}
+counts_eff <- table(data$weight_class, data$efficiency_rank)
+row_freq_eff <- prop.table(counts_eff, margin = 1)
+plot_data_eff <- t(row_freq_eff) * 100
+
+weight_num <- as.numeric(data$weight_class)
+eff_num    <- as.numeric(data$efficiency_rank)
+cor_val    <- cor(weight_num, eff_num, method = "spearman")
+
+cols_eff <- c("#d7191c", "#fdae61", "#abd9e9", "#2c7bb6")
+
+bp <- barplot(plot_data_eff, 
+              beside = TRUE, 
+              main = "Fuel Efficiency by Weight Class",
+              xlab = "Weight Class",
+              ylab = "Percentage (%)",
+              col = cols_eff, 
+              border = "white",
+              legend.text = TRUE, 
+              args.legend = list(x = "top", bty = "n", inset = -0.05, horiz = TRUE),
+              ylim = c(0, 160))
+
+text(x = bp, 
+     y = plot_data_eff, 
+     labels = paste0(round(plot_data_eff, 0), "%"), 
+     pos = 3, 
+     cex = 0.7, 
+     col = "black")
+```
+
+**Distribution of Efficiency by Weight (%):**
+
+```{r weight-efficiency-table}
+kable(round(row_freq_eff * 100, 1),
+      caption = "Efficiency Rank Distribution by Weight Class (%)",
+      format = "markdown")
+```
+
+**Spearman Correlation:** `r round(cor_val, 2)`
+
+**Interpretation:** The chart demonstrates a clear inverse relationship where lightweight cars overwhelmingly achieve top efficiency ratings while very heavy cars predominantly occupy the lowest efficiency tier:
+
+- **Lightweight:** 70% achieve "Ultra Efficient" status, with only 3% relegated to "Budget" efficiency
+- **Moderate:** More balanced distribution with 34% "Efficient" and 30% "Standard"
+- **Heavy:** Shifted toward lower efficiency with 40% "Standard" and 29% "Budget"
+- **Very Heavy:** Dominated by poor efficiency with 88% in "Budget" tier and 0% achieving "Ultra Efficient"
+
+The extremely strong negative Spearman correlation (rho = -0.85) confirms that vehicle weight is a critical—arguably the most critical—predictor of fuel efficiency in this dataset. This ordinal analysis validates the continuous weight-MPG correlation documented earlier, demonstrating that the mass penalty operates consistently across all weight ranges. The relationship is so strong that weight class alone can predict efficiency tier with remarkable accuracy: lightweight vehicles almost guarantee high efficiency, while heavy vehicles almost guarantee poor efficiency, with few exceptions bridging this divide.
+
+## Strategic Tiering (Faiyaz's Analysis - Ordinal Contingency Analysis)
+
+```{r task-3-3, fig.cap="Efficiency Categories Produced by Manufacturing Region"}
+efficiency_table <- table(data$origin, data$efficiency_rank)
+barplot(t(efficiency_table), 
+        main = "Efficiency Categories Produced by Region",
+        xlab = "Manufacturing Origin", ylab = "Number of Vehicles",
+        col = terrain.colors(4), 
+        legend = colnames(efficiency_table),
+        args.legend = list(x = "topright", bty = "n"))
+```
+
+**Finding:** The contingency analysis provides mathematical proof of the regional divide in engineering priorities and market strategies:
+
+**Japanese Dominance in High-Efficiency Market:** Japanese manufacturers successfully captured the high-efficiency market segment, with `r round((efficiency_table['Japan','Ultra Efficient'] / sum(efficiency_table['Japan',]))*100, 1)`% of their total production output reaching the "Ultra Efficient" tier. This represents the highest concentration of top-tier efficiency vehicles among all three regions, validating Japan's strategic commitment to fuel economy as a competitive advantage.
+
+**USA Volume Focus on Standard/Budget Tiers:** The USA produced the highest raw volume of vehicles across all categories, but these were largely concentrated in the "Budget" and "Standard" categories. Only `r round((efficiency_table['USA','Ultra Efficient'] / sum(efficiency_table['USA',]))*100, 1)`% of American production reached "Ultra Efficient" status, demonstrating a slower institutional response to fuel economy demands and continued market preference for traditional larger vehicle designs despite rising fuel costs.
+
+**European Consistency in Efficient Category:** Europe demonstrated a balanced production strategy, significantly outperforming the American fleet in the "Efficient" category while maintaining presence across all tiers. European manufacturers occupied a strategic middle ground, producing both economy vehicles competitive with Japanese offerings and larger vehicles for premium segments, reflecting the diverse market demands across European countries with varying fuel taxation policies and consumer preferences.
+
+### Contingency Table Analysis
+
+**A. Contingency Table with Marginal Totals (Raw Counts)**
+
+```{r contingency-margins}
+kable(addmargins(efficiency_table),
+      caption = "Efficiency Rank by Origin (Counts with Marginals)",
+      format = "markdown")
+```
+
+**B. Proportional Table (Percentages by Region)**
+
+```{r contingency-proportions}
+kable(round(prop.table(efficiency_table, 1) * 100, 2),
+      caption = "Efficiency Rank Distribution by Origin (%)",
+      format = "markdown")
+```
+
+**Analytical Significance:** While the bar chart provides an intuitive visual overview of regional differences, these contingency tables serve as the rigorous mathematical foundation proving the strategic divide. The proportional table (B) is particularly revealing: it demonstrates that Japan achieved a concentration of 38% of their vehicles in "Ultra Efficient" tier, compared to only 8% for USA and 16% for Europe. These quantified differences confirm that regional manufacturers pursued fundamentally different engineering strategies in response to identical external oil crisis pressures, with Japanese manufacturers making the most aggressive pivot toward efficiency and American manufacturers maintaining the strongest commitment to traditional performance-oriented designs despite adverse market conditions.
+
+## Historical Progression Across Eras (Ramez's Analysis)
+
+```{r era-analysis, fig.cap="Evolution of Efficiency-Power Trade-off Across Historical Eras"}
+par(mfrow = c(1, 3), mar = c(5, 4, 4, 1))
+
+for (e in levels(data$era)) {
+  sub <- subset(data, era == e)
+
+  plot(sub$horsepower,
+       sub$mpg,
+       pch = 19,
+       col = "gray30",
+       main = e,
+       xlab = "Horsepower",
+       ylab = "MPG",
+       xlim = range(data$horsepower),
+       ylim = range(data$mpg),
+       bty = "l")
+
+  lines(lowess(sub$horsepower, sub$mpg),
+        col = "#5DA5DA",
+        lwd = 2)
+}
+```
+
+**Analysis:** Separating the efficiency-power relationship by historical era reveals how the fundamental trade-off between performance and fuel economy evolved across three distinct periods defined by external economic and regulatory pressures:
+
+**Pre Oil Crisis (1970-1973):** The leftmost panel shows vehicles achieving relatively lower MPG values for comparable horsepower levels. The LOWESS curve occupies the lower portion of the MPG range, reflecting the pre-crisis industry norm where fuel economy was a secondary consideration and manufacturers freely prioritized power output without significant efficiency constraints. Vehicle designs emphasized performance, with large displacement engines, minimal aerodynamic optimization, and heavy construction.
+
+**Oil Crisis (1973-1977):** The middle panel captures the industry's initial response to oil price shocks. The LOWESS curve shows upward shift, indicating manufacturers rapidly improved efficiency for given power levels through emission control system optimization, minor weight reduction efforts, and introduction of more efficient carburetor designs. The crisis period represents a transitional phase where manufacturers began adapting technologies while still producing many traditional high-power, low-efficiency vehicles for consumers who demanded familiar performance characteristics.
+
+**Post Crisis (1977-1982):** The rightmost panel reveals the most dramatic transformation. The entire efficiency-power relationship has shifted substantially upward, with the LOWESS curve occupying significantly higher MPG values across all horsepower levels. This shift reflects lasting technological and regulatory changes: widespread adoption of fuel injection systems (beginning late in this period), systematic weight reduction through materials substitution and unibody construction, improved aerodynamics, and most importantly, fundamental market shift toward acceptance of smaller engines and reduced performance in exchange for lower fuel costs. The post-crisis era established new industry norms that persisted into subsequent decades.
+
+**Historical Validation:** These three panels provide visual confirmation of the industry's forced evolution documented throughout this analysis. The systematic upward shift in the efficiency-power relationship demonstrates that external pressures—not voluntary manufacturer initiative—drove the most rapid transformation in automotive engineering priorities in industry history. The crisis served as an inflection point that permanently altered the industry's relationship between performance and efficiency, with manufacturers unable to return to pre-crisis norms even after oil prices eventually stabilized.
+
+\newpage
+
+# Discussion and Findings
+
+## Summary of Key Findings
+
+This comprehensive analysis of 398 vehicles manufactured during 1970-1982 reveals three fundamental insights about automotive engineering during this transformative period:
+
+### 1. Physical Principles Validated Through Data
+
+The analysis confirms that vehicle weight represents the single most powerful predictor of fuel efficiency (r = -0.83), demonstrating what we term the "Mass Penalty"—the unavoidable thermodynamic reality that heavier vehicles require more energy for acceleration, sustained motion, and overcoming rolling resistance. This strong correlation validates weight reduction as the most effective mechanical strategy for improving fuel economy, explaining why lightweight construction became the defining characteristic of fuel-efficient vehicles.
+
+The horsepower-acceleration relationship (r = -0.69, R² = 0.48) validates the direct power-to-performance connection, confirming that approximately half of acceleration performance variation can be explained by engine power output alone. This demonstrates the fundamental mechanical principle that power translates predictably to vehicle dynamics, though other factors (weight, transmission efficiency, aerodynamics) account for the remaining performance variation.
+
+Engine displacement's strong negative correlation with MPG (r = -0.80) establishes engine size as a primary fuel consumption driver, second only to vehicle weight. The systematic scaling of displacement with cylinder count (from 73 cu.in for 3-cylinder to 345 cu.in for 8-cylinder engines) validates geometric engineering constraints that necessitate larger total displacement when increasing cylinder count to maintain appropriate individual cylinder dimensions.
+
+### 2. Regional Manufacturing Philosophies and Strategic Responses
+
+The data reveals stark regional differences in engineering priorities and crisis adaptation strategies:
+
+**Japanese Strategy - Lightweight Excellence:** Japanese manufacturers achieved median fuel economy of 31.6 MPG—70% superior to American vehicles' 18.5 MPG median—through systematic commitment to lightweight construction (56% of vehicles in "Lightweight" category) and small displacement engines. This strategy enabled 38% of Japanese production to reach "Ultra Efficient" status, demonstrating the most aggressive and successful adaptation to oil crisis pressures.
+
+**American Strategy - Traditional Continuation:** American manufacturers maintained focus on larger, heavier vehicles (40% in "Very Heavy" category, only 11% "Lightweight"), resulting in lowest median MPG (18.5) and slowest efficiency gains. Only 8% of American production achieved "Ultra Efficient" status, reflecting institutional inertia, existing production infrastructure optimized for large vehicles, and continued domestic market demand for traditional performance and size characteristics despite rising fuel costs.
+
+**European Strategy - Balanced Middle Ground:** European manufacturers occupied strategic middle position with 26.5 MPG median, producing both compact economy vehicles and larger premium offerings. This balanced approach reflected diverse market demands across European countries with varying fuel taxation and consumer preferences, enabling 16% of production to reach "Ultra Efficient" status while maintaining presence in all market segments.
+
+These regional differences validate that manufacturers facing identical external pressures (oil crises, regulatory mandates) pursued fundamentally different adaptation strategies based on institutional capabilities, market positioning, and strategic priorities. Japanese manufacturers' lightweight focus proved most effective for efficiency gains, while American manufacturers' traditional commitment created lasting competitive disadvantages in fuel economy that persist in contemporary market dynamics.
+
+### 3. Historical Transformation: The Efficiency-Performance Trade-off
+
+The temporal analysis quantifies the systematic industry transformation forced by oil crises and regulatory pressures:
+
+**Performance Decline:** Average acceleration time increased 11% (from 14.7 to 16.3 seconds) while horsepower declined 26% (from 121 to 89 HP) between early 1970s (1970-1974) and late period (1978-1982). This performance degradation was not voluntary but rather the inevitable consequence of emission control implementations (catalytic converters, exhaust gas recirculation), engine downsizing mandates (CAFE standards), and market shift toward smaller vehicles.
+
+**Efficiency Gains:** Simultaneously, average MPG improved 50% (from 19.3 to 28.8 MPG), demonstrating that the industry successfully pivoted toward efficiency when external pressures made this transition economically necessary. The improvement rate accelerated after 1973-1974 (visible in MPG-over-time LOWESS curves), confirming that crisis served as inflection point triggering rapid technological adaptation.
+
+**Era-Based Analysis:** Separating the efficiency-power relationship across three historical eras (Pre Crisis 1970-1973, Crisis 1973-1977, Post Crisis 1977-1982) reveals systematic upward shift in the efficiency curve. Vehicles in the Post Crisis era achieved markedly higher MPG for equivalent horsepower compared to Pre Crisis designs, validating that external pressures drove permanent technological progress rather than temporary adaptations that would revert once immediate crisis pressures subsided.
+
+This transformation represents the most rapid shift in automotive priorities in industry history, driven entirely by external economic shocks and regulatory mandates rather than competitive innovation or voluntary manufacturer initiative. The crisis permanently altered the industry's fundamental relationship between performance and efficiency, establishing new norms that persist into contemporary vehicle design even after oil prices eventually stabilized.
+
+## Data Validity and Limitations
+
+### Strengths Supporting Validity
+
+**Historical Consistency:** All observed values align closely with documented specifications for 1970s-1980s vehicles. The displacement range (68-455 cubic inches) matches the era's production engines, from compact 4-cylinder economy engines to large-displacement V8 performance engines. MPG values (9-46.6) are consistent with pre-fuel-injection carburetor technology that dominated this period. Horsepower decline from early to late decade matches documented impacts of emission control implementations and engine detuning required by Clean Air Act compliance.
+
+**Physical Principles Alignment:** The strong negative correlations between weight/MPG (r=-0.83) and displacement/MPG (r=-0.80) align perfectly with fundamental thermodynamic principles governing energy conversion efficiency and rolling resistance. The mass penalty relationship confirms that heavier vehicles must overcome greater inertial and friction forces, requiring proportionally more fuel energy for equivalent motion. These relationships validate the dataset's internal consistency with established physics.
+
+**Engineering Constraints Validated:** The systematic progression of displacement with cylinder count (geometric scaling principle) confirms proper engineering relationships. The near-doubling of displacement from 4-cylinder to 8-cylinder engines (110 to 345 cu.in mean) reflects the constraint that larger engines require more cylinders to maintain acceptable individual cylinder dimensions and avoid excessive piston stroke that would create mechanical stress and efficiency losses.
+
+**Historical Trends Match Documentation:** The temporal decline in horsepower and acceleration coupled with rising MPG precisely matches documented industry responses to 1973 and 1979 oil crises, CAFE standards implementation (1975), and Clean Air Act emission regulations (1970). The era-based analysis showing systematic efficiency improvements across the decade provides quantitative validation of qualitative historical narratives about this transformational period.
+
+**Regional Differences Reflect Known Philosophies:** The stark contrast between Japanese lightweight designs (56% Lightweight, 31.6 MPG median) and American heavy vehicles (40% Very Heavy, 18.5 MPG median) matches extensively documented differences in regional manufacturing philosophies, market demands, and strategic responses to fuel economy pressures. These differences validate the dataset's ability to capture real-world regional variation in engineering approaches.
+
+### Limitations and Scope Constraints
+
+**Temporal Limitation:** The dataset is restricted to 1970-1982, capturing only the carbureted engine era before widespread fuel injection adoption (mid-1980s onward). Results may not generalize to modern vehicles with electronic fuel injection, variable valve timing, turbocharging, hybrid powertrains, or electric vehicles. The relationships documented here represent mechanical constraints specific to 1970s-1980s technology levels.
+
+**Missing Data Handling:** Six vehicles (1.5% of dataset) had missing horsepower values that required imputation using historically accurate values researched from automotive specification databases. While this approach minimizes bias compared to deletion or mean imputation, it introduces minor uncertainty. Sensitivity analyses (not shown) confirmed that results remain substantively unchanged regardless of specific imputation values used for these six observations.
+
+**Sample Composition Bias:** The dataset is dominated by USA manufacturers (249 vehicles, 62.6%), potentially underrepresenting the full diversity of Japanese and European designs available during this period. While the sample sizes for Japan (79) and Europe (70) remain adequate for statistical analysis, the USA dominance may influence overall summary statistics and could overweight American design characteristics in aggregate findings.
+
+**Technology Limitations:** The dataset contains no hybrid vehicles, electric vehicles, or turbocharged engines because these technologies were not commercially available during 1970-1982. Diesel engines are also underrepresented. Results therefore characterize conventional gasoline engine vehicles specifically and cannot address alternative powertrain technologies that became prominent in subsequent decades.
+
+**Variable Limitations:** Several potentially important variables are absent from the dataset: transmission type (automatic vs manual), drivetrain configuration (front-wheel vs rear-wheel drive), aerodynamic drag coefficient, tire specifications, and final drive ratios. These omitted variables likely explain portions of the unexplained variance in our regression models (e.g., the R² = 0.48 for horsepower-acceleration relationship indicates 52% of acceleration variance derives from factors beyond horsepower alone).
+
+**Geographic Specificity:** Results reflect the North American automotive market during a period of specific regulatory environment (US CAFE standards, US emissions regulations). Findings may not fully generalize to vehicles sold exclusively in other markets with different regulatory frameworks, fuel taxation policies, or consumer preferences during the same period.
+
+### Statistical Robustness
+
+Despite these limitations, the dataset provides robust statistical foundation for primary conclusions:
+
+**Adequate Sample Size:** n=398 vehicles provides sufficient statistical power to detect moderate and large effect sizes. Strong correlations (|r| > 0.6) observed throughout analysis indicate robust relationships unlikely to be artifacts of sampling variation.
+
+**Consistent Patterns:** Multiple analytical approaches (Pearson correlation, Spearman correlation, regression analysis, contingency tables, boxplot comparisons) yield convergent findings, increasing confidence that results represent genuine patterns rather than methodological artifacts.
+
+**Effect Size Magnitudes:** The very strong effect sizes observed (weight-MPG r=-0.83, weight-efficiency rho=-0.85) indicate relationships so powerful that they would be detected even with substantially smaller sample sizes or measurement imprecision.
+
+## Conclusions and Contemporary Relevance
+
+The 1970s Oil Crisis created a natural experiment in automotive engineering, forcing all manufacturers to confront identical external pressures—fuel price shocks, emission regulations, efficiency mandates—while revealing dramatically different institutional responses and adaptation capabilities. Japanese manufacturers demonstrated the most aggressive and successful pivot toward lightweight, fuel-efficient designs, fundamentally validating that weight reduction and engine downsizing represent the most effective mechanical strategies for achieving fuel economy improvements. American manufacturers maintained stronger commitment to traditional heavy vehicle designs, adapting more slowly and less comprehensively, creating competitive disadvantages in fuel efficiency that persist in contemporary market dynamics. European manufacturers occupied a strategic middle ground, balancing diverse market segment demands while achieving moderate efficiency improvements.
+
+The systematic trade-off documented throughout this analysis—11% performance decline, 50% efficiency gain, 26% horsepower reduction—demonstrates that the automotive industry successfully transformed its fundamental priorities when external economic and regulatory pressures made this transition economically necessary. The oil crisis served as inflection point triggering rapid technological adaptation and permanent shift in the industry's relationship between performance and efficiency. Manufacturers proved capable of dramatic innovation when market conditions demanded change, contradicting claims that engineering constraints or consumer preferences made efficiency improvements infeasible or unacceptable.
+
+**Contemporary Relevance:** These findings maintain direct relevance as the contemporary automotive industry faces analogous transformation pressures driven by climate change regulations, electrification mandates, and shifting consumer environmental consciousness:
+
+**Mass Penalty Persists in Electric Era:** The fundamental physics governing the weight-efficiency relationship documented in this 1970s-1980s dataset apply equally to contemporary electric vehicles. Battery mass creates substantial mass penalty reducing electric vehicle range, making lightweight construction through aluminum, carbon fiber, and structural optimization critical for maximizing efficiency. The lessons learned during 1970s weight reduction efforts directly inform contemporary EV engineering strategies.
+
+**Regional Competition Continues:** The regional differences documented here—Japanese focus on efficiency, American emphasis on size/power, European balanced approach—persist in contemporary global automotive competition. Japanese and European manufacturers maintained efficiency advantages through subsequent decades, while American manufacturers required government intervention (2000s-era CAFE updates, bankruptcy restructurings) to force modernization and efficiency improvements. Historical patterns of regional adaptation capability predict contemporary competitive dynamics.
+
+**Regulatory Effectiveness Validated:** The demonstrated success of 1970s CAFE standards and emission regulations in forcing rapid industry transformation validates regulatory approaches for addressing contemporary climate challenges. The industry proved capable of achieving 50% efficiency improvement within single decade when faced with binding mandates, suggesting that aggressive contemporary regulations (electric vehicle mandates, fleet efficiency targets, emission limits) can similarly accelerate technological transitions despite industry resistance claims that such changes are technically or economically infeasible.
+
+**Performance Trade-offs Remain Negotiable:** The historical willingness to accept 11% performance decline in exchange for 50% efficiency gain demonstrates that consumers and markets can adapt to performance compromises when economic circumstances (fuel costs) or social pressures (environmental concerns) make efficiency paramount. Contemporary resistance to electric vehicle adoption often centers on range anxiety and performance concerns, but historical precedent shows that market preferences shift rapidly when external conditions change, suggesting that current adoption barriers may prove less durable than pessimistic projections suggest.
+
+The 1970s automotive transformation provides both cautionary tale and encouraging precedent for contemporary industry challenges. Manufacturers resistant to change faced competitive disadvantages (American manufacturers' prolonged struggles), while those embracing new priorities achieved strategic advantages (Japanese manufacturers' global market share gains). The same physical principles—mass penalty, aerodynamic efficiency, powertrain optimization—continue governing vehicle design regardless of propulsion technology, making the fundamental lessons from this transformative era directly applicable to contemporary electric vehicle engineering and the ongoing transition toward sustainable transportation systems.
+
+## Scope of Analysis
+
+This report focused specifically on mechanical relationships (weight, displacement, horsepower, acceleration, fuel efficiency) and regional manufacturing differences (USA, Europe, Japan) during the 1970-1982 period. The analysis prioritized statistically robust relationships with clear engineering or historical significance:
+
+**Included Relationships:** Weight-MPG correlation documenting mass penalty; horsepower-acceleration validating power-performance connection; displacement-cylinders confirming geometric scaling; temporal trends quantifying efficiency-performance trade-off; regional comparisons revealing distinct engineering philosophies.
+
+**Deliberately Excluded:** Other variables present in the dataset (car names, specific model details) were not analyzed as they provided insufficient statistical power for meaningful conclusions or fell outside the report's mechanical engineering focus. Contemporary technologies (hybrid systems, electric powertrains, turbocharging, direct fuel injection) were not addressed as they were unavailable during the study period.
+
+The focused scope enabled deep investigation of fundamental mechanical principles and historical patterns while maintaining clarity and coherence throughout the analysis. Broader investigations incorporating additional variables or more recent data would complement but not contradict the core findings established here regarding the transformative impact of 1970s oil crises on automotive engineering priorities and the fundamental physics governing vehicle fuel efficiency.
+
+\newpage
+
+# References
+
+1. UCI Machine Learning Repository. (2017). *Auto MPG Dataset*. University of California, Irvine, School of Information and Computer Sciences. https://archive.ics.uci.edu/dataset/9/auto+mpg
+
+2. Wikipedia contributors. (2025). *1973 oil crisis*. Wikipedia, The Free Encyclopedia. https://en.wikipedia.org/wiki/1973_oil_crisis
+
+3. Wikipedia contributors. (2025). *Corporate Average Fuel Economy*. Wikipedia, The Free Encyclopedia. https://en.wikipedia.org/wiki/Corporate_average_fuel_economy
+
+4. Yergin, D. (1991). *The Prize: The Epic Quest for Oil, Money & Power*. New York: Free Press.
+
+5. Quinlan, R. (1993). Combining instance-based and model-based learning. *Proceedings of the Tenth International Conference on Machine Learning*, 236-243.
+
+6. R Core Team (2024). *R: A Language and Environment for Statistical Computing*. R Foundation for Statistical Computing, Vienna, Austria.
+
+7. Xie, Y., Allaire, J. J., & Grolemund, G. (2018). *R Markdown: The Definitive Guide*. Chapman and Hall/CRC.
